@@ -1,7 +1,5 @@
 
 ## 📁 Struktur Folder
-
-```
 /opt/devops
 ├── 00-gateway/       # Reverse proxy utama (SSL, routing semua domain)
 ├── 01-infra/         # Database, cache, dan backup terpusat
