@@ -1,0 +1,59 @@
+
+
+docker compose build --no-cache wa-service
+docker compose up -d wa-service
+docker logs -f service-wa-gateway
+docker compose run --rm wa-service npm install multer
+
+
+1. Hapus container lama yang nyangkut:
+
+Bash
+docker compose rm -s -v wa-service
+2. Build ulang dari nol (tanpa cache):
+
+Bash
+docker compose build --no-cache wa-service
+3. Nyalakan bot-nya:
+
+Bash
+docker compose up -d wa-service
+Pantau & Buktikan!
+Setelah itu nyala, cek log-nya:
+
+Bash
+docker logs -f service-wa-gateway
+Begitu muncul ✅ WHATSAPP TERHUBUNG! Bot siap digunakan., tutup terminal log-nya (atau buka terminal baru), dan langsung tembakkan PDF-mu:
+
+Bash
+docker exec -it service-asrama-putri php artisan laporan:generate-harian-putri
+
+QR CODE BARU
+rm -rf auth_info_baileys
+rm -rf auth_info_baileys/*
+mkdir auth_info_baileys
+docker compose stop wa-service
+docker compose up -d --force-recreate wa-service
+docker restart service-wa-gateway
+docker logs -f service-wa-gateway
+
+kalau restart biasa ubah code pakai ini(kalau bug baru no cache)
+docker-compose up -d --build wa-service
+
+// ganti wa
+rm -rf wa-service/auth_info_baileys/*
+docker restart service-wa-gateway
+docker logs -f service-wa-gateway
+
+
+
+// ganti index.js
+# Atau stop + start (sesi aman)
+docker compose stop wa-service
+docker compose start wa-service
+docker compose up -d --build --force-recreate wa-service
+ docker logs -f service-wa-gateway
+
+
+// sekarang kalauganti index.js tinggal
+docker compose restart wa-service

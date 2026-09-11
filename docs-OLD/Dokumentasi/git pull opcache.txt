@@ -1,0 +1,3 @@
+git pull
+docker compose exec aset-manajemen-khusus php artisan optimize:clear
+docker restart service-aset-manajemen-khusus

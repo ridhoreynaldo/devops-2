@@ -1,0 +1,27 @@
+networks:
+  global-gateway-net:
+    external: true # Memanggil network yang sudah dibuat oleh Nginx
+
+services:
+  wa-gateway:
+    build: 
+      context: ./wa-gateway
+      dockerfile: Dockerfile
+    container_name: service-wa-gateway
+    restart: unless-stopped
+    ports:
+      - "5000:5000" # Port disesuaikan dengan Express di index.js
+    volumes:
+      - ./wa-gateway/auth_info_baileys:/app/auth_info_baileys
+      # Mount groups.json agar data grup permanen saat restart
+      - ./wa-gateway/groups.json:/app/groups.json
+      # Opsional: Jika ingin live-reload index.js tanpa build ulang saat development
+      # - ./wa-gateway/index.js:/app/index.js 
+    networks:
+      - global-gateway-net
+
+  # Contoh jika ada rclone di stack yang sama
+  # rclone:
+  #   image: rclone/rclone
+  #   container_name: service-rclone
+  #   ...

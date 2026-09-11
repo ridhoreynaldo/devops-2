@@ -1,0 +1,116 @@
+
+x-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  # ==========================================
+  # 1. POSTGRESQL (Jatah: RAM 1.5GB, CPU 2 Core)
+  # ==========================================
+  postgres-db:
+    image: postgres:16-alpine
+    container_name: infra_postgres
+    restart: unless-stopped
+    logging: *default-logging
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: LontongKacang1337!!
+      TZ: Asia/Jakarta
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./backup/postgresql:/var/opt/postgresql/backup
+      - ./postgres/postgresql.conf:/etc/postgresql/postgresql.conf:ro
+    command: ["postgres", "-c", "config_file=/etc/postgresql/postgresql.conf"]
+    networks:
+      - global-gateway-net
+    deploy:
+      resources:
+        limits:
+          memory: 1.5G    # Hard Limit RAM
+          cpus: '2.0'     # Maksimal hanya boleh pakai 1 Core CPU
+
+  # ==========================================
+  # 2. PGBOUNCER (Jatah: RAM 256MB, CPU 0.5 Core)
+  # ==========================================
+  pgbouncer:
+    image: edoburu/pgbouncer:latest
+    container_name: infra_pgbouncer
+    restart: unless-stopped
+    logging: *default-logging
+    volumes:
+      - ./postgres/pgbouncer.ini:/etc/pgbouncer/pgbouncer.ini:ro
+      - ./postgres/userlist.txt:/etc/pgbouncer/userlist.txt:ro
+    ports:
+      - "5432:5432"
+    networks:
+      - global-gateway-net
+    depends_on:
+      - postgres-db
+    deploy:
+      resources:
+        limits:
+          memory: 256M    # Hard Limit RAM
+          cpus: '0.5'     # Sangat ringan, setengah core sudah sisa-sisa
+
+  # ==========================================
+  # 3. SQL SERVER (Jatah: RAM 2.5GB, CPU 2 Core)
+  # ==========================================
+  sqlserver-db:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: infra_sqlserver
+    restart: unless-stopped
+    logging: *default-logging
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "LontongKacang1337!!"
+      MSSQL_PID: "Express"
+      TZ: Asia/Jakarta
+    ports:
+      # - "127.0.0.1:1433:1433" # tidak bisa diakses dari luar
+      - "1433:1433"
+    volumes:
+      - sqlserver-data:/var/opt/mssql
+      - ./backup/sqlserver:/var/opt/mssql/backup
+      - ./sqlserver/mssql.conf:/var/opt/mssql/mssql.conf:ro
+    networks:
+      - global-gateway-net
+    deploy:
+      resources:
+        limits:
+          memory: 2G    # Hard Limit Docker (2 GB) dari sql server express dibatasin
+          cpus: '4.0'     # Maksimal boleh pakai 4 Core CPU
+
+  # ==========================================
+  # 4. REDIS CACHE (Jatah: RAM 256MB, CPU 0.5 Core)
+  # ==========================================
+  redis-cache:
+    image: redis:7-alpine
+    container_name: infra_redis
+    restart: unless-stopped
+    logging: *default-logging
+    # Mengatur password dan limit memori langsung dari command
+    command: >
+      redis-server 
+      --requirepass dlDpnbe6O3SxERGH0VcBCaIUs8wNgXTi 
+      --maxmemory 256mb 
+      --maxmemory-policy allkeys-lru
+    volumes:
+      - redis-data:/data
+    networks:
+      - global-gateway-net
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.5'
+
+volumes:
+  postgres-data:
+  sqlserver-data:
+  redis-data:
+
+networks:
+  global-gateway-net:
+    external: true

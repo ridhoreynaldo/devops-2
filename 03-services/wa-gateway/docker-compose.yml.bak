@@ -1,0 +1,14 @@
+
+
+  wa-service: 
+    build: ./wa-service
+    container_name: service-wa-gateway
+    restart: unless-stopped
+    logging: *default-logging # 👈 Paling krusial di sini karena library WA biasanya sangat berisik log-nya
+    ports:
+      - "3000:3000" 
+    volumes:
+      - ./wa-service/auth_info_baileys:/app/auth_info_baileys
+      - ./wa-service/index.js:/app/index.js
+    networks:
+      - web-network

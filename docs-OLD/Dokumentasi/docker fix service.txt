@@ -1,0 +1,18 @@
+docker compose build --no-cache
+docker compose up -d
+
+perbaiki dockerfile pake kode diatas
+
+
+docker compose up -d --build pake ini aja
+
+
+kalau ganti Dockerfile pake ini 
+docker compose up -d --build asrama-putri
+docker exec -it service-asrama-putri composer install
+docker exec -it service-asrama-putri composer dump-autoload
+docker exec -it service-asrama-putri php artisan storage:link
+
+
+env update
+docker compose up -d --force-recreate wa-service

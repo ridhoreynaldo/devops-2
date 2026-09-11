@@ -1,0 +1,36 @@
+# ===== Environment & Secrets =====
+.env
+**/.env
+*.env.local
+04-services/wa-gateway/auth_info_baileys/
+
+# ===== SSL Certificates =====
+# 00-gateway/ssl/**/*.pem
+# 00-gateway/ssl/**/*.crt
+# 00-gateway/ssl/**/*.key
+# 00-gateway/letsencrypt/
+# 00-gateway/certbot/www/
+
+# ===== Logs =====
+**/logs/
+*.log
+
+# ===== Database & Backup Data =====
+# 01-infra/postgres/**/data/
+# 01-infra/sqlserver/**/data/
+# 01-infra/redis/**/data/
+01-infra/backup/
+# 01-infra/backup/*.dump
+# 01-infra/backup/*.gz
+
+# ===== Aplikasi (source code) =====
+apps/**/src/
+
+# ===== Dependencies (kalau ada yang lolos ke luar src) =====
+**/vendor/
+**/node_modules/
+
+# ===== Docker & OS junk =====
+.DS_Store
+Thumbs.dbapps/**/src/
+01-infra/backup/

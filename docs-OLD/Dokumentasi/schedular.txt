@@ -1,0 +1,14 @@
+php artisan schedule:clear-cache
+php artisan optimize:clear
+php artisan schedule:list
+
+
+#########################################################################################################################
+# Backup Database Otomatis (Setiap jam 23:00)
+0 22 * * * /home/admin-quality/Docker/sqlserver/backup.sh >> /home/admin-quality/Docker/sqlserver/logs/backup.log 2>&1
+
+# Scheduler Auto Cek Bayar (15 Menit) & Generate Laporan (Jam 23:50) untuk Asrama Putri
+* * * * * /usr/bin/docker exec service-asrama-putri php artisan schedule:run >> /home/admin-quality/cron.log 2>&1
+
+# Auto Backup GDRIVE
+00 23 * * * docker compose -f /home/admin-quality/Docker/docker-compose.yml run --rm rclone-backup --config /config/rclone/rclone.conf sync /data/database gdrive:BackupRR/database --drive-client-id="680186237864-gfpufjgmrv3fpuh3sc5qk5oc4aasco8i.apps.googleusercontent.com" --drive-client-secret="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" --drive-token='{"access_token":"","token_type":"Bearer","refresh_token":"1//04vibXciBrRsgCgYIARAAGAQSNwF-L9Irn8sAQ94IBsTHPAxU4sRNZ-eAQ9FFg_oJJbq1_fA1tVmy0ylHFWGAQCvf4LEQEs-S1nQ"}' -v

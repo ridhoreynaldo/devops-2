@@ -1,0 +1,127 @@
+1. Tambah di docker-compose.yml:
+yamlservices:
+  gateway:
+    image: nginx:alpine
+    ports:
+      - "8043:80"
+      - "8443:443"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+    restart: unless-stopped
+    depends_on:
+      asrama-putri:
+        condition: service_healthy
+      asrama-putra:
+        condition: service_healthy
+      asset-maintenance:
+        condition: service_healthy
+      keuangan:                          # ← tambah ini
+        condition: service_healthy
+    networks:
+      - web-network
+
+  asrama-putri:
+    build: ./asrama-putri
+    container_name: service-asrama-putri
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "php-fpm", "-t"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - web-network
+
+  asrama-putra:
+    build: ./asrama-putra
+    container_name: service-asrama-putra
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "php-fpm", "-t"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - web-network
+
+  asset-maintenance:
+    build: ./asset-maintenance
+    container_name: service-asset-maintenance
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "php-fpm", "-t"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - web-network
+
+  keuangan:                              # ← service baru
+    build: ./keuangan
+    container_name: service-keuangan
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "php-fpm", "-t"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - web-network
+
+networks:
+  web-network:
+    driver: bridge
+
+2. Tambah location di nginx/conf.d/default.conf:
+nginxlocation ^~ /keuangan {
+    include fastcgi_params;
+    fastcgi_param SCRIPT_FILENAME /var/www/html/public/index.php;
+    set $new_uri $request_uri;
+    if ($request_uri ~ ^/keuangan(/.*)$) {
+        set $new_uri $1;
+    }
+    if ($request_uri = /keuangan) {
+        set $new_uri /;
+    }
+    fastcgi_param REQUEST_URI $new_uri;
+    fastcgi_param DOCUMENT_URI $document_uri;
+    fastcgi_param HTTPS on;
+    fastcgi_pass keuangan:9000;
+}
+
+3. Jalankan hanya service baru tanpa ganggu yang lain:
+bash# Build dan start service baru saja
+docker compose up -d --build aset-manajemen-v2
+
+# kalau ingin restart build baru
+docker compose up -d --build aset-manajemen-v2
+
+# Reload nginx untuk baca config baru (tanpa restart service lain)
+docker compose exec gateway nginx -s reload
+
+# Cek semua masih jalan
+docker compose ps
+
+# restart jika error
+docker compose restart aset-manajemen-v2
+docker compose exec gateway nginx -s reload
+
+
+
+# cek wsl docker dan ubuntu sudah jalan belum
+wsl --list --verbose
+wsl -d Ubuntu-22.04
+
+
+
+
+# Instal login vendor
+docker-compose exec dosen composer install
+
+# key
+docker-compose exec dosen php artisan key:generate

@@ -1,0 +1,10 @@
+db backup locations
+\\wsl.localhost\docker-desktop\tmp\docker-desktop-root\var\lib\docker\volumes\sqlserver_mssql_data\_data\data
+
+folder diatas mengarah backup sql lewat
+/var/opt/mssql/data/dbAsramaPutra.bak
+
+folder windows
+/backup/dbAsramaPutra_2026.bak
+
+/home/admin-quality/Docker/rclone/backup/database:/backup

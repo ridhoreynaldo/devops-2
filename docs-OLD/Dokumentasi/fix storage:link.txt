@@ -1,0 +1,16 @@
+exit
+admin-quality@WIN-H3939FQ2BUI:~/Docker/aset-manajemen-khusus$ sudo chown -R $USER:$USER storage
+[sudo] password for admin-quality: 
+admin-quality@WIN-H3939FQ2BUI:~/Docker/aset-manajemen-khusus$ sudo chmod -R 777 storage
+
+
+docker-compose up -d --force-recreate gateway
+docker compose up -d --force-recreate aset-manajemen-khusus
+
+# public storage
+sudo chown -R $USER:$USER storage
+sudo chmod -R 777 storage
+sudo chmod -R 777 storage bootstrap/cache
+
+# ganti env , restart service
+docker compose up -d --no-deps --force-recreate aset-manajemen-khusus

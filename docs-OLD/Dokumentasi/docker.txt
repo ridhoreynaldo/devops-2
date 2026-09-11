@@ -1,0 +1,19 @@
+ssh admin-quality@192.168.3.10 -p 2222
+
+cat docker/nginx/ssl/certificate.crt docker/nginx/ssl/portaluniversitasquality-ca.crt > docker/nginx/ssl/fullchain.pem
+
+docker-compose build
+docker-compose up -d
+docker-compose down
+docker pull composer:latest
+docker-compose build --no-cache
+
+docker exec -it asrama-app bash
+
+chmod +x check-transaksi.sh
+crontab -e
+*/5 * * * * /home/admin-quality/projects/Asrama/check-transaksi.sh >> /home/admin-quality/projects/Asrama/transaksi-log.txt 2>&1
+pwd
+
+
+\\wsl.localhost\Ubuntu-24.04\home\admin-quality\Docker\asrama-putra \\wsl.localhost\Ubuntu-24.04\home\admin-quality\Docker\asset-maintenance \\wsl.localhost\Ubuntu-24.04\home\admin-quality\Docker\DOC \\wsl.localhost\Ubuntu-24.04\home\admin-quality\Docker\nginx \\wsl.localhost\Ubuntu-24.04\home\admin-quality\Docker\sqlserver-belum diperbaiki \\wsl.localhost\Ubuntu-24.04\home\admin-quality\Docker\docker-compose.yml \\wsl.localhost\Ubuntu-24.04\home\admin-quality\Docker\url

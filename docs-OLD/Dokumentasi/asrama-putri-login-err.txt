@@ -1,0 +1,8 @@
+docker exec -it service-asrama-putri chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
+docker exec -it service-asrama-putri chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
+docker-compose exec asrama-putri php artisan optimize:clear
+
+# ASET KHUSUS
+docker exec -it service-aset-manajemen-khusus chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
+docker exec -it service-aset-manajemen-khusus chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
+docker-compose exec aset-manajemen-khusus php artisan optimize:clear
