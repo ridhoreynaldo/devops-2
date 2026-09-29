@@ -10,7 +10,7 @@
 # Lokasi install standar: /opt/devops-2 (sesuai nama repo & BASE_DIR default script)
 set -euo pipefail
 
-BRANCH="${BRANCH:-fix/review-hardening}"
+BRANCH="${BRANCH:-main}"
 REPO_URL="https://github.com/ridhoreynaldo/devops-2.git"
 BASE_DIR="/opt/devops-2"
 NETWORK="global-gateway-net"
@@ -144,7 +144,7 @@ log "== Layer 3: services =="
 docker compose -f "$BASE_DIR/03-services/docker-compose.yml" up -d --build
 
 log "== Layer 4: gateway =="
-docker compose -f "$BASE_DIR/00-gateway/docker-compose.yml" up -d
+docker compose -f "$BASE_DIR/00-gateway/docker-compose.yml" up -d --force-recreate
 docker exec global_gateway nginx -t
 docker exec global_gateway nginx -s reload || true
 
