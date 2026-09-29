@@ -3,9 +3,9 @@
 # clone repo, generate secrets, dan jalankan semua layer.
 #
 # Cara pakai (di VPS sebagai root):
-#   curl -fsSL https://raw.githubusercontent.com/ridhoreynaldo/devops-2/fix/review-hardening/bootstrap.sh | bash
-# Atau dengan branch lain:
-#   curl -fsSL ... | BRANCH=main bash
+#   curl -fsSL https://raw.githubusercontent.com/ridhoreynaldo/devops-2/main/bootstrap.sh | bash
+# Buka semua port ke publik:
+#   curl -fsSL https://raw.githubusercontent.com/ridhoreynaldo/devops-2/main/bootstrap.sh | PUBLIC_PORTS=1 bash
 #
 # Lokasi install standar: /opt/devops-2 (sesuai nama repo & BASE_DIR default script)
 set -euo pipefail
@@ -14,6 +14,13 @@ BRANCH="${BRANCH:-fix/review-hardening}"
 REPO_URL="https://github.com/ridhoreynaldo/devops-2.git"
 BASE_DIR="/opt/devops-2"
 NETWORK="global-gateway-net"
+
+# Mode port publik:  curl ... | PUBLIC_PORTS=1 bash
+# Membind semua port service ke 0.0.0.0 (bisa diakses publik).
+# Default: 127.0.0.1 (hanya localhost, lebih aman).
+if [ "${PUBLIC_PORTS:-0}" = "1" ]; then
+  export BIND_IP="0.0.0.0"
+fi
 
 log()  { echo -e "\033[1;32m[bootstrap]\033[0m $*"; }
 warn() { echo -e "\033[1;33m[bootstrap][WARN]\033[0m $*"; }
@@ -124,6 +131,9 @@ wait_healthy() { # wait_healthy <container> <timeout_detik>
 }
 
 log "== Layer 1: infra (database) =="
+if [ "${PUBLIC_PORTS:-0}" = "1" ]; then
+  log "PUBLIC_PORTS=1: semua port service dibuka ke publik (0.0.0.0)."
+fi
 docker compose -f "$BASE_DIR/01-infra/docker-compose.yml" up -d
 wait_healthy infra_postgres 180
 
@@ -139,8 +149,14 @@ docker exec global_gateway nginx -t
 docker exec global_gateway nginx -s reload || true
 
 # ----------------------------------------------------------
-# 6. Ringkasan
+# 6. Firewall (bila UFW aktif) + ringkasan
 # ----------------------------------------------------------
+if [ "${PUBLIC_PORTS:-0}" = "1" ] && command -v ufw >/dev/null 2>&1 \
+   && ufw status 2>/dev/null | grep -q "Status: active"; then
+  ufw allow 5432,1433,3000,3001,5000,9000/tcp
+  log "Port service dibuka di UFW."
+fi
+
 log "Selesai! Status container:"
 docker ps --format '  {{.Names}}  {{.Status}}' | sort
 

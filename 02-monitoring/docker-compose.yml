@@ -18,7 +18,7 @@ services:
     logging: *default-logging
     ports:
       # Bind ke localhost saja - akses via reverse proxy / SSH tunnel
-      - "127.0.0.1:9000:9000"
+      - "${BIND_IP:-127.0.0.1}:9000:9000"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - portainer_data:/data
@@ -39,7 +39,7 @@ services:
     restart: unless-stopped
     logging: *default-logging
     ports:
-      - "127.0.0.1:3001:3001"
+      - "${BIND_IP:-127.0.0.1}:3001:3001"
     volumes:
       - uptime_kuma_data:/app/data
       # docker.sock HANYA jika pakai monitor tipe "Docker Container" (read-only!)
@@ -124,7 +124,7 @@ services:
     env_file:
       - .env
     ports:
-      - "127.0.0.1:3000:3000"
+      - "${BIND_IP:-127.0.0.1}:3000:3000"
     volumes:
       - grafana_data:/var/lib/grafana
     environment:

@@ -15,7 +15,7 @@ services:
     logging: *default-logging
     ports:
       # Bind ke localhost saja - expose ke publik hanya lewat 00-gateway
-      - "127.0.0.1:5000:5000"
+      - "${BIND_IP:-127.0.0.1}:5000:5000"
     volumes:
       - ./wa-gateway/auth_info_baileys:/app/auth_info_baileys
       # Mount groups.json agar data grup permanen saat restart
