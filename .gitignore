@@ -4,6 +4,7 @@
 *.env.local
 # Sesi WhatsApp Baileys = kunci akses penuh akun WA
 03-services/wa-gateway/auth_info_baileys/
+03-services/wa-gateway/sessions/
 # Password pgbouncer (lihat userlist.txt.example)
 01-infra/postgres/userlist.txt
 
