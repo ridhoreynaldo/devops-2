@@ -33,3 +33,5 @@ apps/**/src/
 .DS_Store
 Thumbs.db
 03-services/.env
+04-apps/portfolio/
+04-apps/.env

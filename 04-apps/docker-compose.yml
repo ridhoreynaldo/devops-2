@@ -1,0 +1,43 @@
+# 04-apps/docker-compose.yml
+# Layer aplikasi. Setiap aplikasi = repo git sendiri yang di-clone oleh
+# bootstrap.sh ke 04-apps/<nama> (lihat Layer 5). Hasil clone & .env
+# JANGAN di-commit (sudah di .gitignore).
+
+x-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  portfolio:
+    build: ./portfolio
+    image: devops-portfolio:latest
+    container_name: app_portfolio
+    restart: unless-stopped
+    logging: *default-logging
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      HOSTNAME: "0.0.0.0"
+    ports:
+      - "${PORTFOLIO_PORT:-3002}:3000"
+    networks:
+      - global-gateway-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 90s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+
+networks:
+  global-gateway-net:
+    external: true

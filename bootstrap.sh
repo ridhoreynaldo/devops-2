@@ -161,16 +161,110 @@ log "== Layer 3: services =="
 docker compose -f "$BASE_DIR/03-services/docker-compose.yml" up -d --build
 
 log "== Layer 4: gateway =="
+
+# --- SSL Let's Encrypt untuk ridhoreynaldo.com (diterbitkan sekali saja) ---
+LE_LIVE="$BASE_DIR/00-gateway/letsencrypt/live/ridhoreynaldo.com"
+if [ ! -f "$LE_LIVE/fullchain.pem" ]; then
+  VPS_IPv4=$(curl -4 -fsSL --max-time 5 ifconfig.me 2>/dev/null || true)
+  DOMAIN_IP=$(getent hosts ridhoreynaldo.com 2>/dev/null | awk '{print $1}' | grep -E '^[0-9]{1,3}\.' | head -1)
+  if [ -n "$VPS_IPv4" ] && [ "$DOMAIN_IP" = "$VPS_IPv4" ]; then
+    log "Menerbitkan sertifikat Let's Encrypt untuk ridhoreynaldo.com ..."
+    docker stop global_gateway 2>/dev/null || true
+    if [ -n "${CERTBOT_EMAIL:-}" ]; then EMAIL_ARG="--email ${CERTBOT_EMAIL}"; else EMAIL_ARG="--register-unsafely-without-email"; fi
+    # shellcheck disable=SC2086
+    if docker run --rm -p 80:80 -v "$BASE_DIR/00-gateway/letsencrypt:/etc/letsencrypt" \
+      certbot/certbot:v2.11.0 certonly --standalone \
+      -d ridhoreynaldo.com -d www.ridhoreynaldo.com \
+      --non-interactive --agree-tos $EMAIL_ARG; then
+      log "Sertifikat Let's Encrypt terbit."
+    else
+      warn "Gagal menerbitkan sertifikat — lanjut tanpa HTTPS (pastikan DNS & port 80 terbuka)."
+    fi
+  else
+    warn "ridhoreynaldo.com belum mengarah ke IP VPS ini — lewati penerbitan SSL."
+  fi
+else
+  log "Sertifikat Let's Encrypt sudah ada."
+fi
+
+# Pasang vhost HTTPS hanya bila sertifikat tersedia (agar nginx -t tidak gagal)
+SSL_CONF="$BASE_DIR/00-gateway/nginx/conf.d/ridhoreynaldo-com-ssl.conf"
+if [ -f "$LE_LIVE/fullchain.pem" ]; then
+  cp "$BASE_DIR/00-gateway/nginx/ridhoreynaldo-com-ssl.conf.template" "$SSL_CONF"
+  log "Vhost HTTPS ridhoreynaldo.com dipasang."
+else
+  rm -f "$SSL_CONF"
+fi
+
 docker compose -f "$BASE_DIR/00-gateway/docker-compose.yml" up -d --force-recreate
 docker exec global_gateway nginx -t
 docker exec global_gateway nginx -s reload || true
 
+# Cron harian: reload nginx agar sertifikat hasil auto-renew langsung terpakai
+if command -v crontab >/dev/null 2>&1; then
+  if ! crontab -l 2>/dev/null | grep -q "global_gateway nginx -s reload"; then
+    (crontab -l 2>/dev/null; echo "17 3 * * * docker exec global_gateway nginx -s reload >/dev/null 2>&1 || true") | crontab -
+    log "Cron reload nginx harian dipasang."
+  fi
+fi
+
 # ----------------------------------------------------------
+# ----------------------------------------------------------
+# 5b. Layer 5: aplikasi (04-apps) — clone repo + deploy
+# ----------------------------------------------------------
+log "== Layer 5: apps =="
+APPS_DIR="$BASE_DIR/04-apps"
+mkdir -p "$APPS_DIR"
+if [ ! -d "$APPS_DIR/portfolio/.git" ]; then
+  log "Clone repo portfolio ..."
+  git clone --depth 1 https://github.com/ridhoreynaldo/portfolio "$APPS_DIR/portfolio" \
+    || warn "Repo portfolio belum tersedia — lewati deploy aplikasi."
+else
+  git -C "$APPS_DIR/portfolio" fetch --depth 1 origin main 2>/dev/null \
+    && git -C "$APPS_DIR/portfolio" reset --hard FETCH_HEAD \
+    || warn "Gagal update repo portfolio — pakai versi lokal."
+fi
+
+# .env untuk 04-apps (sekali saja): kredensial diambil dari 01-infra/.env
+if [ ! -f "$APPS_DIR/.env" ]; then
+  log "Generate 04-apps/.env ..."
+  PG_SUPER_PASS=$(grep '^POSTGRES_PASSWORD=' "$BASE_DIR/01-infra/.env" 2>/dev/null | cut -d= -f2-)
+  cat > "$APPS_DIR/.env" <<EOF
+PGHOST=infra_pgbouncer
+PGPORT=5432
+PGUSER=postgres
+PGPASSWORD=$PG_SUPER_PASS
+PGDATABASE=portfolio
+JWT_SECRET=$(openssl rand -hex 32)
+ADMIN_EMAIL=admin@local
+ADMIN_PASSWORD=$(gen_pass)
+PORTFOLIO_PORT=3002
+EOF
+  chmod 600 "$APPS_DIR/.env"
+else
+  log "04-apps/.env sudah ada, tidak di-generate ulang."
+fi
+
+# Pastikan database portfolio ada (PgBouncer wildcard hanya routing)
+if [ -d "$APPS_DIR/portfolio/.git" ]; then
+  PG_SUPER_PASS=$(grep '^POSTGRES_PASSWORD=' "$BASE_DIR/01-infra/.env" 2>/dev/null | cut -d= -f2-)
+  if ! docker exec -e PGPASSWORD="$PG_SUPER_PASS" infra_postgres psql -U postgres -tc "SELECT 1 FROM pg_database WHERE datname='portfolio'" 2>/dev/null | grep -q 1; then
+    log "Membuat database portfolio ..."
+    docker exec -e PGPASSWORD="$PG_SUPER_PASS" infra_postgres psql -U postgres -c "CREATE DATABASE portfolio" \
+      || warn "Gagal membuat database portfolio."
+  fi
+  log "Deploy portfolio ..."
+  docker compose -f "$APPS_DIR/docker-compose.yml" up -d --build \
+    || warn "Gagal deploy portfolio."
+else
+  warn "Folder $APPS_DIR/portfolio tidak ada — lewati deploy aplikasi."
+fi
+
 # 6. Firewall (bila UFW aktif) + ringkasan
 # ----------------------------------------------------------
 if [ "${PUBLIC_PORTS:-0}" = "1" ] && command -v ufw >/dev/null 2>&1 \
    && ufw status 2>/dev/null | grep -q "Status: active"; then
-  ufw allow 5432,1433,3000,3001,5000,5001,9000,20128/tcp
+  ufw allow 80,443,3002,5432,1433,3000,3001,5000,5001,9000,20128/tcp
   log "Port service dibuka di UFW."
 fi
 
@@ -180,15 +274,21 @@ docker ps --format '  {{.Names}}  {{.Status}}' | sort
 echo ""
 if [ "${PUBLIC_PORTS:-0}" = "1" ]; then
   PUB_IP=$(curl -4 -fsSL --max-time 5 ifconfig.me 2>/dev/null || hostname -I | awk '{print $1}')
-  log "Akses layanan via IP publik (tanpa SSL/domain):"
+  log "Akses layanan:"
   log "  - WA dashboard : http://$PUB_IP:5001"
   log "  - WA API       : http://$PUB_IP:5000"
   log "  - Portainer    : http://$PUB_IP:9000"
   log "  - Grafana      : http://$PUB_IP:3000"
   log "  - Uptime Kuma  : http://$PUB_IP:3001"
   log "  - 9Router AI   : http://$PUB_IP:20128"
+  log "  - Portfolio    : http://$PUB_IP:3002"
   echo ""
 fi
+if [ -f "$BASE_DIR/00-gateway/letsencrypt/live/ridhoreynaldo.com/fullchain.pem" ]; then
+  log "Web (HTTPS): https://ridhoreynaldo.com"
+fi
+PORTFOLIO_ADMIN_PASS=$(grep '^ADMIN_PASSWORD=' "$BASE_DIR/04-apps/.env" 2>/dev/null | cut -d= -f2-)
+[ -n "$PORTFOLIO_ADMIN_PASS" ] && log "Login Portfolio admin@local: $PORTFOLIO_ADMIN_PASS"
 NINEROUTER_PASS=$(grep '^NINEROUTER_PASSWORD=' "$BASE_DIR/03-services/.env" 2>/dev/null | cut -d= -f2-)
 [ -n "$NINEROUTER_PASS" ] && log "Password dashboard 9Router: $NINEROUTER_PASS"
 warn "Langkah manual berikutnya:"
