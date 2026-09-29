@@ -88,6 +88,8 @@ services:
       - PORT=20128
       - HOSTNAME=0.0.0.0
       - NODE_ENV=production
+      # Password awal dashboard (hanya dipakai sebelum user set password sendiri)
+      - INITIAL_PASSWORD=${NINEROUTER_PASSWORD:-}
     volumes:
       # SQLite + token/koneksi provider (jangan di-commit)
       - ./9router/data:/app/data

@@ -109,6 +109,19 @@ else
   log "02-monitoring/.env sudah ada, tidak di-generate ulang."
 fi
 
+if [ ! -f "$BASE_DIR/03-services/.env" ]; then
+  log "Generate password dashboard 9Router ..."
+  cat > "$BASE_DIR/03-services/.env" <<EOF
+NINEROUTER_PASSWORD=$(gen_pass)
+EOF
+  chmod 600 "$BASE_DIR/03-services/.env"
+elif ! grep -q '^NINEROUTER_PASSWORD=' "$BASE_DIR/03-services/.env"; then
+  log "Menambah NINEROUTER_PASSWORD ke 03-services/.env ..."
+  echo "NINEROUTER_PASSWORD=$(gen_pass)" >> "$BASE_DIR/03-services/.env"
+else
+  log "03-services/.env sudah ada, tidak di-generate ulang."
+fi
+
 if [ ! -f "$BASE_DIR/scripts/.env" ]; then
   cp "$BASE_DIR/scripts/.env.example" "$BASE_DIR/scripts/.env"
   chmod 600 "$BASE_DIR/scripts/.env"
@@ -176,6 +189,8 @@ if [ "${PUBLIC_PORTS:-0}" = "1" ]; then
   log "  - 9Router AI   : http://$PUB_IP:20128"
   echo ""
 fi
+NINEROUTER_PASS=$(grep '^NINEROUTER_PASSWORD=' "$BASE_DIR/03-services/.env" 2>/dev/null | cut -d= -f2-)
+[ -n "$NINEROUTER_PASS" ] && log "Password dashboard 9Router: $NINEROUTER_PASS"
 warn "Langkah manual berikutnya:"
 warn "  1. WhatsApp gateway butuh scan ulang QR (sesi lama sudah tidak valid)."
 warn "  2. Isi kredensial rclone di $BASE_DIR/scripts/.env lalu atur cron backup."
