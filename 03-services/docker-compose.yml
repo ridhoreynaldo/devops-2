@@ -1,27 +1,40 @@
-networks:
-  global-gateway-net:
-    external: true # Memanggil network yang sudah dibuat oleh Nginx
+# 03-services/docker-compose.yml
+x-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "10m"
+    max-file: "3"
 
 services:
   wa-gateway:
-    build: 
+    build:
       context: ./wa-gateway
       dockerfile: Dockerfile
     container_name: service-wa-gateway
     restart: unless-stopped
+    logging: *default-logging
     ports:
-      - "5000:5000" # Port disesuaikan dengan Express di index.js
+      # Bind ke localhost saja - expose ke publik hanya lewat 00-gateway
+      - "127.0.0.1:5000:5000"
     volumes:
       - ./wa-gateway/auth_info_baileys:/app/auth_info_baileys
       # Mount groups.json agar data grup permanen saat restart
       - ./wa-gateway/groups.json:/app/groups.json
-      # Opsional: Jika ingin live-reload index.js tanpa build ulang saat development
-      # - ./wa-gateway/index.js:/app/index.js 
     networks:
       - global-gateway-net
+    healthcheck:
+      # Tes TCP: Express di index.js listen di 5000
+      test: ["CMD", "node", "-e", "require('net').connect(5000,'127.0.0.1').on('connect',()=>process.exit(0)).on('error',()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '1.0'
 
-  # Contoh jika ada rclone di stack yang sama
-  # rclone:
-  #   image: rclone/rclone
-  #   container_name: service-rclone
-  #   ...
+networks:
+  global-gateway-net:
+    external: true # Memanggil network yang sudah dibuat oleh Nginx

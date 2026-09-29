@@ -1,3 +1,8 @@
+# 01-infra/docker-compose.yml
+#
+# PENTING: semua password diambil dari file .env (jangan hardcode!).
+#   cp .env.example .env   -> lalu isi password yang KUAT & UNIK per service
+# File .env sudah masuk .gitignore dan TIDAK BOLEH di-commit.
 
 x-logging: &default-logging
   driver: "json-file"
@@ -7,16 +12,18 @@ x-logging: &default-logging
 
 services:
   # ==========================================
-  # 1. POSTGRESQL (Jatah: RAM 1.5GB, CPU 2 Core)
+  # 1. POSTGRESQL
   # ==========================================
   postgres-db:
     image: postgres:16-alpine
     container_name: infra_postgres
     restart: unless-stopped
     logging: *default-logging
+    env_file:
+      - .env
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: LontongKacang1337!!
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?isi POSTGRES_PASSWORD di file .env}
       TZ: Asia/Jakarta
     volumes:
       - postgres-data:/var/lib/postgresql/data
@@ -25,17 +32,23 @@ services:
     command: ["postgres", "-c", "config_file=/etc/postgresql/postgresql.conf"]
     networks:
       - global-gateway-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
     deploy:
       resources:
         limits:
-          memory: 1.5G    # Hard Limit RAM
-          cpus: '2.0'     # Maksimal hanya boleh pakai 1 Core CPU
+          memory: 1.5G
+          cpus: '2.0'
 
   # ==========================================
-  # 2. PGBOUNCER (Jatah: RAM 256MB, CPU 0.5 Core)
+  # 2. PGBOUNCER
   # ==========================================
   pgbouncer:
-    image: edoburu/pgbouncer:latest
+    image: pgbouncer/pgbouncer:1.25
     container_name: infra_pgbouncer
     restart: unless-stopped
     logging: *default-logging
@@ -43,63 +56,83 @@ services:
       - ./postgres/pgbouncer.ini:/etc/pgbouncer/pgbouncer.ini:ro
       - ./postgres/userlist.txt:/etc/pgbouncer/userlist.txt:ro
     ports:
-      - "5432:5432"
+      # Hanya bisa diakses dari server ini. Aplikasi lain pakai network internal.
+      - "127.0.0.1:5432:5432"
     networks:
       - global-gateway-net
     depends_on:
-      - postgres-db
+      postgres-db:
+        condition: service_healthy
+    # Catatan: tidak ada healthcheck di sini — pgbouncer otomatis
+    # menyambung ulang ke postgres saat backend sudah siap.
     deploy:
       resources:
         limits:
-          memory: 256M    # Hard Limit RAM
-          cpus: '0.5'     # Sangat ringan, setengah core sudah sisa-sisa
+          memory: 256M
+          cpus: '0.5'
 
   # ==========================================
-  # 3. SQL SERVER (Jatah: RAM 2.5GB, CPU 2 Core)
+  # 3. SQL SERVER
   # ==========================================
   sqlserver-db:
     image: mcr.microsoft.com/mssql/server:2022-latest
     container_name: infra_sqlserver
     restart: unless-stopped
     logging: *default-logging
+    env_file:
+      - .env
     environment:
       ACCEPT_EULA: "Y"
-      MSSQL_SA_PASSWORD: "LontongKacang1337!!"
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:?isi MSSQL_SA_PASSWORD di file .env}
       MSSQL_PID: "Express"
       TZ: Asia/Jakarta
     ports:
-      # - "127.0.0.1:1433:1433" # tidak bisa diakses dari luar
-      - "1433:1433"
+      # Hanya bisa diakses dari server ini, JANGAN expose 0.0.0.0
+      - "127.0.0.1:1433:1433"
     volumes:
       - sqlserver-data:/var/opt/mssql
       - ./backup/sqlserver:/var/opt/mssql/backup
       - ./sqlserver/mssql.conf:/var/opt/mssql/mssql.conf:ro
     networks:
       - global-gateway-net
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$${MSSQL_SA_PASSWORD}\" -Q 'SELECT 1' -C -b -o /dev/null || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
     deploy:
       resources:
         limits:
-          memory: 2G    # Hard Limit Docker (2 GB) dari sql server express dibatasin
-          cpus: '4.0'     # Maksimal boleh pakai 4 Core CPU
+          memory: 2G
+          cpus: '4.0'
 
   # ==========================================
-  # 4. REDIS CACHE (Jatah: RAM 256MB, CPU 0.5 Core)
+  # 4. REDIS CACHE
   # ==========================================
   redis-cache:
     image: redis:7-alpine
     container_name: infra_redis
     restart: unless-stopped
     logging: *default-logging
-    # Mengatur password dan limit memori langsung dari command
+    env_file:
+      - .env
+    # Password dibaca dari env di dalam container (tidak kelihatan di docker inspect)
     command: >
-      redis-server 
-      --requirepass dlDpnbe6O3SxERGH0VcBCaIUs8wNgXTi 
-      --maxmemory 256mb 
-      --maxmemory-policy allkeys-lru
+      sh -c 'exec redis-server
+      --requirepass "$${REDIS_PASSWORD:?isi REDIS_PASSWORD di file .env}"
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru'
     volumes:
       - redis-data:/data
     networks:
       - global-gateway-net
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$${REDIS_PASSWORD}\" ping | grep -q PONG"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     deploy:
       resources:
         limits:

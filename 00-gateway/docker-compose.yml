@@ -1,11 +1,18 @@
 # 00-gateway/docker-compose.yml
+x-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   gateway_nginx:
-    image: nginx:alpine
+    image: nginx:1.30-alpine
     container_name: global_gateway
     restart: unless-stopped
+    logging: *default-logging
     ports:
-      # KUNCI: Kunci port 80 & 443 hanya di IP 90.100
+      # KUNCI: kunci port 80 & 443 hanya di IP lokal bila perlu, contoh:
       # - "192.168.90.100:80:80"
       # - "192.168.90.100:443:443"
       - "80:80"
@@ -18,21 +25,43 @@ services:
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx/snippets:/etc/nginx/snippets:ro
       - ./logs:/var/log/nginx
       - ./letsencrypt:/etc/letsencrypt
       - ./certbot/www:/var/www/certbot
       - ./ssl:/etc/nginx/ssl:ro
     networks:
       - global-gateway-net
-    # Pertahankan ini untuk perpanjangan SSL otomatis (renew) di background
+    healthcheck:
+      # Port 80 default me-return 444 -> wget tetap exit 0 selama konek
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/ || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '1.0'
+
   certbot:
-    image: certbot/certbot
+    image: certbot/certbot:v2.11.0
     container_name: certbot_auto_renew
     restart: unless-stopped
+    logging: *default-logging
     volumes:
       - ./letsencrypt:/etc/letsencrypt
       - ./certbot/www:/var/www/certbot
-    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
+    # Renew tiap 12 jam. PENTING: challenge HTTP-01 dilayani nginx lewat
+    # snippets/acme-challenge.conf yang di-include di server port 80.
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew --quiet; sleep 12h & wait $${!}; done;'"
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.5'
+
 networks:
   global-gateway-net:
-    external: true   # <--- INI KUNCI PERBAIKANNYA
+    external: true

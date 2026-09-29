@@ -1,13 +1,24 @@
+# 02-monitoring/docker-compose.yml
+#
+# Password Grafana diambil dari file .env (jangan hardcode!).
+#   cp .env.example .env   -> lalu isi GF password yang kuat
+
+x-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   # 1. PORTAINER (Manajemen Container)
   portainer:
-    image: portainer/portainer-ce:latest
+    image: portainer/portainer-ce:2.45.1-alpine
     container_name: devops_portainer
     restart: unless-stopped
+    logging: *default-logging
     ports:
-      # Bind hanya ke localhost - akses via reverse proxy / SSH tunnel, JANGAN expose 0.0.0.0
-      # - "127.0.0.1:9000:9000"
-      - "9000:9000"
+      # Bind ke localhost saja - akses via reverse proxy / SSH tunnel
+      - "127.0.0.1:9000:9000"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - portainer_data:/data
@@ -15,45 +26,45 @@ services:
       - global-gateway-net
     security_opt:
       - no-new-privileges:true
-    mem_limit: 256m
-    cpus: 0.5
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.5'
 
   # 2. UPTIME KUMA (Monitoring Web Nyala/Mati)
   uptime-kuma:
-    image: louislam/uptime-kuma:1
+    image: louislam/uptime-kuma:2.5.5
     container_name: devops_uptime_kuma
     restart: unless-stopped
+    logging: *default-logging
     ports:
-      - "3001:3001"
+      - "127.0.0.1:3001:3001"
     volumes:
       - uptime_kuma_data:/app/data
-      # docker.sock DIHAPUS - hanya perlu jika pakai fitur "Docker Container" monitor.
-      # Kalau memang dipakai, uncomment baris di bawah (read-only, bukan read-write):
+      # docker.sock HANYA jika pakai monitor tipe "Docker Container" (read-only!)
       # - /var/run/docker.sock:/var/run/docker.sock:ro
-      # 👇 Tambahkan baris ini untuk memberikan akses Kunci Master
-      - /var/run/docker.sock:/var/run/docker.sock
     dns:
       - 8.8.8.8
       - 1.1.1.1
     networks:
       - global-gateway-net
-    # Jangan Pakai ini
-    # extra_hosts:
-    #   - "portaluniversitasquality.ac.id:172.29.160.1"
     security_opt:
       - no-new-privileges:true
-    mem_limit: 1g
-    cpus: 1
-    # 👇 FIX 2: Tambahkan Environment Variable untuk manajemen koneksi kueri
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
     environment:
-      - UPTIME_KUMA_SQLITE_SINGLE_CONNECTION=true # Mencegah tabrakan kueri ganda penyebab lock
+      - UPTIME_KUMA_SQLITE_SINGLE_CONNECTION=true # Mencegah lock SQLite
 
-  # 3. GRAFANA STACK (Monitoring Performa Server)
+  # 3. CADVISOR (Metrik container)
   cadvisor:
     image: gcr.io/cadvisor/cadvisor:v0.49.1
     container_name: devops_cadvisor
     restart: unless-stopped
-    # privileged:true diganti dengan capability spesifik yang cadvisor benar-benar butuhkan
+    logging: *default-logging
     cap_add:
       - SYS_ADMIN
     security_opt:
@@ -72,13 +83,18 @@ services:
       - '--docker_only=true'
     networks:
       - global-gateway-net
-    mem_limit: 256m
-    cpus: 0.5
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.5'
 
+  # 4. PROMETHEUS
   prometheus:
-    image: prom/prometheus:latest
+    image: prom/prometheus:v3.15.0
     container_name: devops_prometheus
     restart: unless-stopped
+    logging: *default-logging
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
@@ -93,35 +109,46 @@ services:
       - global-gateway-net
     security_opt:
       - no-new-privileges:true
-    mem_limit: 512m
-    cpus: 0.5
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
 
+  # 5. GRAFANA
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:11.6
     container_name: devops_grafana
     restart: unless-stopped
+    logging: *default-logging
+    env_file:
+      - .env
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     volumes:
       - grafana_data:/var/lib/grafana
     environment:
-      # Set password lewat .env file, jangan hardcode / jangan biarkan default "admin/admin"
-      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
+      # Diisi dari file .env, jangan hardcode / jangan biarkan default admin/admin
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:?isi GRAFANA_ADMIN_PASSWORD di file .env}
     depends_on:
       - prometheus
     networks:
       - global-gateway-net
     security_opt:
       - no-new-privileges:true
-    mem_limit: 256m
-    cpus: 0.5
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.5'
 
-  # 4. NODE EXPORTER (Khusus membaca sisa SSD, CPU Server, Suhu, dll)
+  # 6. NODE EXPORTER (Metrik host: CPU, RAM, disk, suhu)
   node-exporter:
-    image: prom/node-exporter:latest
+    image: prom/node-exporter:v1.12.1
     container_name: devops_node_exporter
     restart: unless-stopped
-    pid: host   # perlu tetap ada - ini best practice resmi node-exporter, bukan celah
+    logging: *default-logging
+    pid: host   # best practice resmi node-exporter, bukan celah
     volumes:
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
@@ -135,8 +162,11 @@ services:
       - global-gateway-net
     security_opt:
       - no-new-privileges:true
-    mem_limit: 128m
-    cpus: 0.3
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: '0.3'
 
 volumes:
   portainer_data:
