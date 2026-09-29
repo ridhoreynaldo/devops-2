@@ -157,7 +157,7 @@ docker exec global_gateway nginx -s reload || true
 # ----------------------------------------------------------
 if [ "${PUBLIC_PORTS:-0}" = "1" ] && command -v ufw >/dev/null 2>&1 \
    && ufw status 2>/dev/null | grep -q "Status: active"; then
-  ufw allow 5432,1433,3000,3001,5000,5001,9000/tcp
+  ufw allow 5432,1433,3000,3001,5000,5001,9000,20128/tcp
   log "Port service dibuka di UFW."
 fi
 
@@ -173,6 +173,7 @@ if [ "${PUBLIC_PORTS:-0}" = "1" ]; then
   log "  - Portainer    : http://$PUB_IP:9000"
   log "  - Grafana      : http://$PUB_IP:3000"
   log "  - Uptime Kuma  : http://$PUB_IP:3001"
+  log "  - 9Router AI   : http://$PUB_IP:20128"
   echo ""
 fi
 warn "Langkah manual berikutnya:"

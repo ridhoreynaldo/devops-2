@@ -72,6 +72,38 @@ services:
           memory: 512M
           cpus: '0.5'
 
+  9router:
+    # AI gateway/router open-source: satu endpoint OpenAI-compatible (port 20128)
+    # untuk 40+ provider AI dengan fallback otomatis. Image resmi: ghcr.io/minhgv/9router
+    image: ghcr.io/minhgv/9router:latest
+    container_name: service-9router
+    restart: unless-stopped
+    logging: *default-logging
+    ports:
+      # Dashboard + API. PUBLIC_PORTS=1 -> ikut terbuka ke publik
+      - "${BIND_IP:-127.0.0.1}:20128:20128"
+    environment:
+      - DATA_DIR=/app/data
+      - PORT=20128
+      - HOSTNAME=0.0.0.0
+      - NODE_ENV=production
+    volumes:
+      # SQLite + token/koneksi provider (jangan di-commit)
+      - ./9router/data:/app/data
+    networks:
+      - global-gateway-net
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:20128/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+
 networks:
   global-gateway-net:
     external: true # Memanggil network yang sudah dibuat oleh Nginx
