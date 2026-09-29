@@ -56,7 +56,9 @@ command -v git >/dev/null 2>&1 || apt-get install -y -qq git
 # ----------------------------------------------------------
 if [ -d "$BASE_DIR/.git" ]; then
   log "Repo sudah ada, update ke branch $BRANCH..."
-  git -C "$BASE_DIR" fetch origin
+  # Fetch eksplisit per-branch: clone lama bersifat --single-branch
+  # (hanya melacak branch lama), jadi "fetch origin" polos akan gagal.
+  git -C "$BASE_DIR" fetch origin "$BRANCH"
   git -C "$BASE_DIR" checkout "$BRANCH"
   git -C "$BASE_DIR" reset --hard "origin/$BRANCH"
 else
