@@ -74,8 +74,9 @@ services:
 
   9router:
     # AI gateway/router open-source: satu endpoint OpenAI-compatible (port 20128)
-    # untuk 40+ provider AI dengan fallback otomatis. Image resmi: ghcr.io/minhgv/9router
-    image: ghcr.io/minhgv/9router:latest
+    # untuk 40+ provider AI dengan fallback otomatis.
+    # Image upstream resmi di Docker Hub (pin versi, bukan latest).
+    image: decolua/9router:0.5.91
     container_name: service-9router
     restart: unless-stopped
     logging: *default-logging
