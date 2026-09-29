@@ -166,7 +166,7 @@ log "== Layer 4: gateway =="
 LE_LIVE="$BASE_DIR/00-gateway/letsencrypt/live/ridhoreynaldo.com"
 if [ ! -f "$LE_LIVE/fullchain.pem" ]; then
   VPS_IPv4=$(curl -4 -fsSL --max-time 5 ifconfig.me 2>/dev/null || true)
-  DOMAIN_IP=$(getent hosts ridhoreynaldo.com 2>/dev/null | awk '{print $1}' | grep -E '^[0-9]{1,3}\.' | head -1)
+  DOMAIN_IP=$(getent hosts ridhoreynaldo.com 2>/dev/null | awk '{print $1}' | grep -E '^[0-9]{1,3}\.' | head -1 || true)
   if [ -n "$VPS_IPv4" ] && [ "$DOMAIN_IP" = "$VPS_IPv4" ]; then
     log "Menerbitkan sertifikat Let's Encrypt untuk ridhoreynaldo.com ..."
     docker stop global_gateway 2>/dev/null || true
@@ -228,7 +228,7 @@ fi
 # .env untuk 04-apps (sekali saja): kredensial diambil dari 01-infra/.env
 if [ ! -f "$APPS_DIR/.env" ]; then
   log "Generate 04-apps/.env ..."
-  PG_SUPER_PASS=$(grep '^POSTGRES_PASSWORD=' "$BASE_DIR/01-infra/.env" 2>/dev/null | cut -d= -f2-)
+  PG_SUPER_PASS=$(grep '^POSTGRES_PASSWORD=' "$BASE_DIR/01-infra/.env" 2>/dev/null | cut -d= -f2- || true)
   cat > "$APPS_DIR/.env" <<EOF
 PGHOST=infra_pgbouncer
 PGPORT=5432
@@ -247,7 +247,7 @@ fi
 
 # Pastikan database portfolio ada (PgBouncer wildcard hanya routing)
 if [ -d "$APPS_DIR/portfolio/.git" ]; then
-  PG_SUPER_PASS=$(grep '^POSTGRES_PASSWORD=' "$BASE_DIR/01-infra/.env" 2>/dev/null | cut -d= -f2-)
+  PG_SUPER_PASS=$(grep '^POSTGRES_PASSWORD=' "$BASE_DIR/01-infra/.env" 2>/dev/null | cut -d= -f2- || true)
   if ! docker exec -e PGPASSWORD="$PG_SUPER_PASS" infra_postgres psql -U postgres -tc "SELECT 1 FROM pg_database WHERE datname='portfolio'" 2>/dev/null | grep -q 1; then
     log "Membuat database portfolio ..."
     docker exec -e PGPASSWORD="$PG_SUPER_PASS" infra_postgres psql -U postgres -c "CREATE DATABASE portfolio" \
@@ -287,7 +287,7 @@ fi
 if [ -f "$BASE_DIR/00-gateway/letsencrypt/live/ridhoreynaldo.com/fullchain.pem" ]; then
   log "Web (HTTPS): https://ridhoreynaldo.com"
 fi
-PORTFOLIO_ADMIN_PASS=$(grep '^ADMIN_PASSWORD=' "$BASE_DIR/04-apps/.env" 2>/dev/null | cut -d= -f2-)
+PORTFOLIO_ADMIN_PASS=$(grep '^ADMIN_PASSWORD=' "$BASE_DIR/04-apps/.env" 2>/dev/null | cut -d= -f2- || true)
 [ -n "$PORTFOLIO_ADMIN_PASS" ] && log "Login Portfolio admin@local: $PORTFOLIO_ADMIN_PASS"
 NINEROUTER_PASS=$(grep '^NINEROUTER_PASSWORD=' "$BASE_DIR/03-services/.env" 2>/dev/null | cut -d= -f2-)
 [ -n "$NINEROUTER_PASS" ] && log "Password dashboard 9Router: $NINEROUTER_PASS"
