@@ -28,6 +28,15 @@ die()  { echo -e "\033[1;31m[bootstrap][ERROR]\033[0m $*" >&2; exit 1; }
 
 [ "$(id -u)" -eq 0 ] || die "Jalankan sebagai root (sudo -i dulu)."
 
+# Cek ruang disk minimum di awal: build image butuh GB-an ruang.
+# Gagal cepat di sini lebih baik daripada build ratusan detik lalu gagal.
+REQ_DISK_GB=5
+AVAIL_DISK_GB=$(df -BG --output=avail / | tail -1 | tr -dc '0-9')
+if [ "$AVAIL_DISK_GB" -lt "$REQ_DISK_GB" ]; then
+  die "Ruang disk tersisa ${AVAIL_DISK_GB}GB < ${REQ_DISK_GB}GB. Bersihkan dulu, mis.: docker builder prune -f, apt clean, hapus arsip lama."
+fi
+log "Ruang disk tersedia: ${AVAIL_DISK_GB}GB."
+
 # ----------------------------------------------------------
 # 1. Docker Engine (official) + git + curl
 # ----------------------------------------------------------
@@ -162,6 +171,21 @@ fi
 docker compose -f "$BASE_DIR/01-infra/docker-compose.yml" up -d
 wait_healthy infra_postgres 180
 
+# Samakan password user postgres di server dengan 01-infra/.env.
+# POSTGRES_PASSWORD hanya dipakai saat init volume kosong; bila volume
+# lebih tua dari .env (mis. .env pernah dihapus), password tidak sinkron
+# dan semua koneksi TCP (PgBouncer/app) ditolak. Idempotent & aman:
+# password selalu base64 dari gen_pass (tanpa single-quote).
+_PG_SYNC_PASS=$(grep '^POSTGRES_PASSWORD=' "$BASE_DIR/01-infra/.env" 2>/dev/null | cut -d= -f2- || true)
+if [ -n "$_PG_SYNC_PASS" ]; then
+  if docker exec infra_postgres psql -U postgres -c "ALTER USER postgres PASSWORD '$_PG_SYNC_PASS';" >/dev/null 2>&1; then
+    log "Password postgres disinkronkan dengan 01-infra/.env."
+  else
+    warn "Gagal sinkron password postgres."
+  fi
+fi
+unset _PG_SYNC_PASS
+
 log "== Layer 2: monitoring =="
 docker compose -f "$BASE_DIR/02-monitoring/docker-compose.yml" up -d
 
@@ -252,6 +276,22 @@ EOF
 else
   log "04-apps/.env sudah ada, tidak di-generate ulang."
 fi
+
+# Selalu samakan PGPASSWORD 04-apps dengan POSTGRES_PASSWORD 01-infra
+# (self-healing bila 01-infra/.env pernah di-generate ulang).
+_PG_APP_PASS=$(grep '^POSTGRES_PASSWORD=' "$BASE_DIR/01-infra/.env" 2>/dev/null | cut -d= -f2- || true)
+if [ -n "$_PG_APP_PASS" ] && [ -f "$APPS_DIR/.env" ]; then
+  _cur=$(grep '^PGPASSWORD=' "$APPS_DIR/.env" 2>/dev/null | cut -d= -f2- || true)
+  if [ "$_cur" != "$_PG_APP_PASS" ]; then
+    grep -v '^PGPASSWORD=' "$APPS_DIR/.env" > "$APPS_DIR/.env.tmp"
+    printf 'PGPASSWORD=%s\n' "$_PG_APP_PASS" >> "$APPS_DIR/.env.tmp"
+    mv "$APPS_DIR/.env.tmp" "$APPS_DIR/.env"
+    chmod 600 "$APPS_DIR/.env"
+    log "PGPASSWORD di 04-apps/.env disinkronkan."
+  fi
+  unset _cur
+fi
+unset _PG_APP_PASS
 
 # Pastikan database portfolio ada (PgBouncer wildcard hanya routing)
 if [ -d "$APPS_DIR/portfolio/.git" ]; then
