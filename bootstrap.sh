@@ -102,7 +102,9 @@ _PGPASS=$(grep '^POSTGRES_PASSWORD=' "$BASE_DIR/01-infra/.env" | cut -d= -f2-)
 while IFS= read -r _line; do
   printf '%s\n' "${_line//SAMAKAN_DENGAN_POSTGRES_PASSWORD_DI_ENV/$_PGPASS}"
 done < "$BASE_DIR/01-infra/postgres/userlist.txt.example" > "$BASE_DIR/01-infra/postgres/userlist.txt"
-chmod 600 "$BASE_DIR/01-infra/postgres/userlist.txt"
+# PgBouncer berjalan sebagai user non-root di dalam container, jadi file ini
+# harus bisa dibaca siapa pun (isinya juga sudah ada di .env yang 600).
+chmod 644 "$BASE_DIR/01-infra/postgres/userlist.txt"
 unset _PGPASS _line
 
 if [ ! -f "$BASE_DIR/02-monitoring/.env" ]; then
