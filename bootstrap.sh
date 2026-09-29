@@ -91,13 +91,19 @@ MSSQL_SA_PASSWORD=$MSSQL_SA_PASSWORD
 REDIS_PASSWORD=$REDIS_PASSWORD
 EOF
   chmod 600 "$BASE_DIR/01-infra/.env"
-  # Samakan userlist pgbouncer dengan password postgres
-  sed "s/SAMAKAN_DENGAN_POSTGRES_PASSWORD_DI_ENV/$POSTGRES_PASSWORD/" \
-    "$BASE_DIR/01-infra/postgres/userlist.txt.example" > "$BASE_DIR/01-infra/postgres/userlist.txt"
-  chmod 600 "$BASE_DIR/01-infra/postgres/userlist.txt"
 else
   log "01-infra/.env sudah ada, tidak di-generate ulang."
 fi
+
+# Selalu samakan userlist pgbouncer dengan POSTGRES_PASSWORD aktif.
+# (Tanpa sed: password base64 bisa mengandung '/' yang merusak substitusi
+# sed s///. Penggantian string bash di bawah ini 100% literal.)
+_PGPASS=$(grep '^POSTGRES_PASSWORD=' "$BASE_DIR/01-infra/.env" | cut -d= -f2-)
+while IFS= read -r _line; do
+  printf '%s\n' "${_line//SAMAKAN_DENGAN_POSTGRES_PASSWORD_DI_ENV/$_PGPASS}"
+done < "$BASE_DIR/01-infra/postgres/userlist.txt.example" > "$BASE_DIR/01-infra/postgres/userlist.txt"
+chmod 600 "$BASE_DIR/01-infra/postgres/userlist.txt"
+unset _PGPASS _line
 
 if [ ! -f "$BASE_DIR/02-monitoring/.env" ]; then
   log "Generate password Grafana baru ..."
