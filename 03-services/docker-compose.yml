@@ -16,14 +16,22 @@ services:
     ports:
       # Bind ke localhost saja - expose ke publik hanya lewat 00-gateway
       - "${BIND_IP:-127.0.0.1}:5000:5000"
+    env_file:
+      - path: ../01-infra/.env
+        required: false
+    environment:
+      # Koneksi ke Postgres layer infra (via global-gateway-net)
+      - PGHOST=infra_postgres
+      - PGPORT=5432
+      - PGUSER=postgres
+      - PGDATABASE=wagateway
     volumes:
-      - ./wa-gateway/auth_info_baileys:/app/auth_info_baileys
-      # Mount groups.json agar data grup permanen saat restart
-      - ./wa-gateway/groups.json:/app/groups.json
+      # Satu folder per sesi WA: sessions/<session-id>/
+      - ./wa-gateway/sessions:/app/sessions
     networks:
       - global-gateway-net
     healthcheck:
-      # Tes TCP: Express di index.js listen di 5000
+      # Tes TCP: Express di src/index.js listen di 5000
       test: ["CMD", "node", "-e", "require('net').connect(5000,'127.0.0.1').on('connect',()=>process.exit(0)).on('error',()=>process.exit(1))"]
       interval: 30s
       timeout: 5s
@@ -34,6 +42,35 @@ services:
         limits:
           memory: 512M
           cpus: '1.0'
+
+  wa-web:
+    build:
+      context: ./wa-web
+      dockerfile: Dockerfile
+    container_name: service-wa-web
+    restart: unless-stopped
+    logging: *default-logging
+    ports:
+      # Dashboard Next.js. PUBLIC_PORTS=1 -> ikut terbuka ke publik
+      - "${BIND_IP:-127.0.0.1}:5001:3000"
+    environment:
+      # Opsional: override URL API (default: hostname yang sama port 5000)
+      - NEXT_PUBLIC_WA_API_URL=${WA_API_URL:-}
+    networks:
+      - global-gateway-net
+    depends_on:
+      - wa-gateway
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3000"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
 
 networks:
   global-gateway-net:
