@@ -179,7 +179,7 @@ docker ps --format '  {{.Names}}  {{.Status}}' | sort
 
 echo ""
 if [ "${PUBLIC_PORTS:-0}" = "1" ]; then
-  PUB_IP=$(curl -fsSL --max-time 5 ifconfig.me 2>/dev/null || hostname -I | awk '{print $1}')
+  PUB_IP=$(curl -4 -fsSL --max-time 5 ifconfig.me 2>/dev/null || hostname -I | awk '{print $1}')
   log "Akses layanan via IP publik (tanpa SSL/domain):"
   log "  - WA dashboard : http://$PUB_IP:5001"
   log "  - WA API       : http://$PUB_IP:5000"
