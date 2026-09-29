@@ -54,7 +54,7 @@ services:
     # Lewati entrypoint bawaan image (exit 1 bila env DATABASES_HOST/
     # DATABASES tidak di-set, walau pgbouncer.ini sudah di-mount).
     # Jalankan pgbouncer langsung dengan config kita (routing wildcard *).
-    entrypoint: ["pgbouncer", "/etc/pgbouncer/pgbouncer.ini"]
+    entrypoint: ["/opt/pgbouncer/pgbouncer", "/etc/pgbouncer/pgbouncer.ini"]
     logging: *default-logging
     volumes:
       - ./postgres/pgbouncer.ini:/etc/pgbouncer/pgbouncer.ini:ro
