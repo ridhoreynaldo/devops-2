@@ -165,10 +165,17 @@ log "Selesai! Status container:"
 docker ps --format '  {{.Names}}  {{.Status}}' | sort
 
 echo ""
+if [ "${PUBLIC_PORTS:-0}" = "1" ]; then
+  PUB_IP=$(curl -fsSL --max-time 5 ifconfig.me 2>/dev/null || hostname -I | awk '{print $1}')
+  log "Akses layanan via IP publik (tanpa SSL/domain):"
+  log "  - WA dashboard : http://$PUB_IP:5001"
+  log "  - WA API       : http://$PUB_IP:5000"
+  log "  - Portainer    : http://$PUB_IP:9000"
+  log "  - Grafana      : http://$PUB_IP:3000"
+  log "  - Uptime Kuma  : http://$PUB_IP:3001"
+  echo ""
+fi
 warn "Langkah manual berikutnya:"
-warn "  1. Arahkan DNS domain ke IP VPS ini."
-warn "  2. Terbitkan SSL: docker exec -it certbot_auto_renew certbot certonly --webroot -w /var/www/certbot -d DOMAINKAMU"
-warn "     lalu buat vhost di 00-gateway/nginx/conf.d/ dan reload gateway."
-warn "  3. WhatsApp gateway butuh scan ulang QR (sesi lama sudah tidak valid)."
-warn "  4. Isi kredensial rclone di $BASE_DIR/scripts/.env lalu atur cron backup."
-warn "  5. Amankan SSH: ganti password root & pakai SSH key, matikan login password."
+warn "  1. WhatsApp gateway butuh scan ulang QR (sesi lama sudah tidak valid)."
+warn "  2. Isi kredensial rclone di $BASE_DIR/scripts/.env lalu atur cron backup."
+warn "  3. Amankan SSH: ganti password root & pakai SSH key, matikan login password."

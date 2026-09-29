@@ -17,6 +17,15 @@ async function main() {
 
   const app = express();
   app.use(express.json({ limit: '2mb' }));
+  // CORS: dashboard (port 5001) memanggil API (port 5000) beda origin.
+  // Mode IP publik tanpa auth — ketatkan lagi bila sudah ada login.
+  app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET,POST,DELETE,OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type');
+    if (req.method === 'OPTIONS') return res.sendStatus(204);
+    next();
+  });
   app.get('/', (req, res) =>
     res.json({ service: 'wa-gateway', version: '2.0.0', dashboard: 'buka wa-web (port 5001)' })
   );
