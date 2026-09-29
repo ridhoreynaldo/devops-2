@@ -57,7 +57,7 @@ services:
       - ./postgres/userlist.txt:/etc/pgbouncer/userlist.txt:ro
     ports:
       # Hanya bisa diakses dari server ini. Aplikasi lain pakai network internal.
-      - "127.0.0.1:5432:5432"
+      - "${BIND_IP:-127.0.0.1}:5432:5432"
     networks:
       - global-gateway-net
     depends_on:
@@ -88,7 +88,7 @@ services:
       TZ: Asia/Jakarta
     ports:
       # Hanya bisa diakses dari server ini, JANGAN expose 0.0.0.0
-      - "127.0.0.1:1433:1433"
+      - "${BIND_IP:-127.0.0.1}:1433:1433"
     volumes:
       - sqlserver-data:/var/opt/mssql
       - ./backup/sqlserver:/var/opt/mssql/backup
@@ -105,7 +105,7 @@ services:
       resources:
         limits:
           memory: 2G
-          cpus: '4.0'
+          cpus: '1.0'
 
   # ==========================================
   # 4. REDIS CACHE
