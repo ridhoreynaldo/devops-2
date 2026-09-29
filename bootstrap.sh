@@ -59,8 +59,10 @@ if [ -d "$BASE_DIR/.git" ]; then
   # Fetch eksplisit per-branch: clone lama bersifat --single-branch
   # (hanya melacak branch lama), jadi "fetch origin" polos akan gagal.
   git -C "$BASE_DIR" fetch origin "$BRANCH"
-  git -C "$BASE_DIR" checkout "$BRANCH"
-  git -C "$BASE_DIR" reset --hard "origin/$BRANCH"
+  # Fetch eksplisit menyimpan di FETCH_HEAD (bukan origin/<branch>),
+  # jadi reset+checkout pakai FETCH_HEAD agar jalan di clone single-branch.
+  git -C "$BASE_DIR" reset --hard FETCH_HEAD
+  git -C "$BASE_DIR" checkout -B "$BRANCH"
 else
   log "Clone repo ke $BASE_DIR (branch $BRANCH)..."
   git clone --branch "$BRANCH" --depth 1 "$REPO_URL" "$BASE_DIR"
