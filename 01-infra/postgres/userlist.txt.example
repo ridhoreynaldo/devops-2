@@ -1,0 +1,6 @@
+# 01-infra/postgres/userlist.txt.example
+# Salin menjadi "userlist.txt" lalu samakan passwordnya dengan
+# POSTGRES_PASSWORD di file .env layer ini.
+#   cp userlist.txt.example userlist.txt
+# File userlist.txt TIDAK BOLEH di-commit (sudah masuk .gitignore).
+"postgres" "SAMAKAN_DENGAN_POSTGRES_PASSWORD_DI_ENV"
